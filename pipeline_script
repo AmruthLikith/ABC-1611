@@ -1,0 +1,108 @@
+pipeline {
+    agent any
+    
+    environment {
+        TOMCAT_URL = 'http://172.174.36.73:8081/'
+        TOMCAT_USER = 'amruth'
+        TOMCAT_PASSWORD = 'amruth'
+        ARTIFACT_NAME = 'Amazon.war'
+        TOMCAT_HOME = '/home/azureuser/tomcat/apache-tomcat-9.0.104'
+    }
+    
+    stages {
+        stage('Clone Project') {
+            steps {
+                git branch: 'master', url: 'https://github.com/AmruthLikith/Amazon'
+            }
+        }
+
+        stage('Check Project Structure') {
+            steps {
+                sh '''
+                echo "Checking directory contents..."
+                ls -al
+                if [ ! -f Amazon/pom.xml ]; then
+                    echo "pom.xml not found! Build cannot continue."
+                    exit 1
+                fi
+                '''
+            }
+        }
+
+        stage('Clean') {
+            steps {
+                dir('Amazon') {
+                    sh 'mvn clean'
+                }
+            }
+        }
+
+        stage('Compile') {
+            steps {
+                dir('Amazon') {
+                    sh 'mvn compile'
+                }
+            }
+        }
+
+        stage('Test') {
+            steps {
+                dir('Amazon') {
+                    sh 'mvn test'
+                }
+            }
+        }
+
+        stage('Build') {
+            steps {
+                dir('Amazon') {
+                    sh 'mvn install'
+                    sh 'echo "Listing target directory:"'
+                    sh 'ls -al target || true'
+                }
+            }
+        }
+
+        stage('Verify Artifact') {
+            steps {
+                dir('Amazon') {
+                    script {
+                        echo 'Verifying if the artifact exists...'
+                        sh '''
+                        if [ ! -f target/Amazon.war ]; then
+                            echo "Artifact Amazon.war not found. Build failed."
+                            exit 1
+                        fi
+                        '''
+                    }
+                }
+            }
+        }
+
+        stage('Deploy') {
+            steps {
+                dir('Amazon') {
+                    script {
+                        echo 'Deploying to Tomcat...'
+                        sh """
+                        cp target/${ARTIFACT_NAME} ${TOMCAT_HOME}/webapps/
+                        """
+                        echo 'Restarting Tomcat...'
+                        sh """
+                        curl -u ${TOMCAT_USER}:${TOMCAT_PASSWORD} -X POST ${TOMCAT_URL}/shutdown
+                        sleep 5
+                        curl -u ${TOMCAT_USER}:${TOMCAT_PASSWORD} -X POST ${TOMCAT_URL}/start
+                        """
+                    }
+                }
+            }
+        }
+    }
+    
+    post {
+        always {
+            echo 'Pipeline execution complete.'
+        }
+    }
+}
+
