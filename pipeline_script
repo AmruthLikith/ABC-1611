@@ -2,26 +2,28 @@ pipeline {
     agent any
     
     environment {
-        TOMCAT_URL = 'http://172.174.36.73:8081/'
-        TOMCAT_USER = 'amruth'
-        TOMCAT_PASSWORD = 'amruth'
-        ARTIFACT_NAME = 'Amazon.war'
-        TOMCAT_HOME = '/home/azureuser/tomcat/apache-tomcat-9.0.104'
+        TOMCAT_URL = 'http://172.174.36.73:8081/'  // Tomcat URL
+        TOMCAT_USER = 'amruth'  // Tomcat server username
+        TOMCAT_PASSWORD = 'amruth'  // Tomcat server password
+        ARTIFACT_NAME = 'Amazon.war'  // Artifact name
+        TOMCAT_HOME = '/home/azureuser/tomcat/apache-tomcat-9.0.104'  // Tomcat home directory
     }
     
     stages {
+        // Stage 1: Clone the project
         stage('Clone Project') {
             steps {
                 git branch: 'master', url: 'https://github.com/AmruthLikith/Amazon'
             }
         }
 
+        // Stage 2: Check Project Structure
         stage('Check Project Structure') {
             steps {
                 sh '''
                 echo "Checking directory contents..."
                 ls -al
-                if [ ! -f Amazon/pom.xml ]; then
+                if [ ! -f Amazon/Amazon-Web/pom.xml ]; then
                     echo "pom.xml not found! Build cannot continue."
                     exit 1
                 fi
@@ -29,33 +31,37 @@ pipeline {
             }
         }
 
+        // Stage 3: Clean the project
         stage('Clean') {
             steps {
-                dir('Amazon') {
+                dir('Amazon/Amazon-Web') { // Corrected path
                     sh 'mvn clean'
                 }
             }
         }
 
+        // Stage 4: Compile the project
         stage('Compile') {
             steps {
-                dir('Amazon') {
+                dir('Amazon/Amazon-Web') { // Corrected path
                     sh 'mvn compile'
                 }
             }
         }
 
+        // Stage 5: Run Tests
         stage('Test') {
             steps {
-                dir('Amazon') {
+                dir('Amazon/Amazon-Web') { // Corrected path
                     sh 'mvn test'
                 }
             }
         }
 
+        // Stage 6: Build the project
         stage('Build') {
             steps {
-                dir('Amazon') {
+                dir('Amazon/Amazon-Web') { // Corrected path
                     sh 'mvn install'
                     sh 'echo "Listing target directory:"'
                     sh 'ls -al target || true'
@@ -63,14 +69,15 @@ pipeline {
             }
         }
 
+        // Stage 7: Verify Artifact
         stage('Verify Artifact') {
             steps {
-                dir('Amazon') {
+                dir('Amazon/Amazon-Web') { // Corrected path
                     script {
                         echo 'Verifying if the artifact exists...'
                         sh '''
-                        if [ ! -f target/Amazon.war ]; then
-                            echo "Artifact Amazon.war not found. Build failed."
+                        if [ ! -f target/${ARTIFACT_NAME} ]; then
+                            echo "Artifact ${ARTIFACT_NAME} not found. Build failed."
                             exit 1
                         fi
                         '''
@@ -79,13 +86,14 @@ pipeline {
             }
         }
 
+        // Stage 8: Deploy to Tomcat
         stage('Deploy') {
             steps {
-                dir('Amazon') {
+                dir('Amazon/Amazon-Web') { // Corrected path
                     script {
                         echo 'Deploying to Tomcat...'
                         sh """
-                        cp target/${ARTIFACT_NAME} ${TOMCAT_HOME}/webapps/
+                        sudo cp target/${ARTIFACT_NAME} ${TOMCAT_HOME}/webapps/
                         """
                         echo 'Restarting Tomcat...'
                         sh """
@@ -105,4 +113,3 @@ pipeline {
         }
     }
 }
-
